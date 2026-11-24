@@ -18,7 +18,7 @@
 // /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const LINE =
@@ -36,6 +36,22 @@ const outDir = process.env.MAKEFUN_OUTPUT_DIR?.trim()
   ? process.env.MAKEFUN_OUTPUT_DIR
   : '/output';
 
+// Write the line exactly, with no trailing newline: the sealed gate
+// reads the file's bytes as the entry, so a stray newline would be
+// part of the judged text.
+const outFile = join(outDir, 'entry.txt');
 mkdirSync(outDir, { recursive: true });
-writeFileSync(join(outDir, 'entry.txt'), LINE + '\n', 'utf8');
+writeFileSync(outFile, LINE, 'utf8');
+
+// Read the file back and verify it is byte-identical to the entry
+// line. A partial write, a wrong encoding, or a stray newline would
+// otherwise ship silently and change what the judge reads, so fail
+// loudly instead of printing a line that does not match the file.
+const written = readFileSync(outFile, 'utf8');
+if (written !== LINE) {
+  throw new Error(
+    `entry.txt mismatch: wrote ${chars} characters but read back ${[...written].length} characters`,
+  );
+}
+
 console.log(LINE);
